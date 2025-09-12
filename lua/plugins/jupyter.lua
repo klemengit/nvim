@@ -70,17 +70,30 @@ return {
         end
 
         -- Send text to Python REPL
-        local function send_to_repl(text)
+        local function send_to_repl(text, ensure_ready)
           if not python_repl:is_open() then
             python_repl:open()
-            -- Wait for terminal to be ready
-            vim.defer_fn(function()
-              python_repl:send(text, false)
-              vim.cmd("wincmd p") -- Return focus to code
-            end, 500)
+            if ensure_ready then
+              -- Wait for full initialization (for multiple commands)
+              vim.defer_fn(function()
+                python_repl:send("import numpy as np", false)
+                python_repl:send("import pandas as pd", false)
+                python_repl:send("import matplotlib.pyplot as plt", false)
+                vim.defer_fn(function()
+                  python_repl:send(text, false)
+                  vim.cmd("wincmd p")
+                end, 500)
+              end, 1000)
+            else
+              -- Quick initialization for single commands
+              vim.defer_fn(function()
+                python_repl:send(text, false)
+                vim.cmd("wincmd p")
+              end, 500)
+            end
           else
             python_repl:send(text, false)
-            vim.cmd("wincmd p") -- Return focus to code immediately
+            vim.cmd("wincmd p")
           end
         end
 
@@ -158,9 +171,8 @@ return {
           -- Run all cells
           if #cells > 0 then
             vim.notify("Running " .. #cells .. " cells above...")
-            for i, code in ipairs(cells) do
-              send_to_repl(code)
-            end
+            local combined_code = table.concat(cells, "\n\n")
+            send_to_repl(combined_code, true) -- Use ensure_ready=true
             vim.notify("✓ Executed " .. #cells .. " cells above")
           else
             vim.notify("No cells found above current position")
