@@ -97,20 +97,6 @@ return {
           end
         end
 
-        -- Start/toggle Python REPL
-        local function toggle_jupyter_repl()
-          python_repl:toggle()
-          if python_repl:is_open() then
-            -- Load common imports when first opened
-            vim.defer_fn(function()
-              -- python_repl:send("import numpy as np", false)
-              -- python_repl:send("import pandas as pd", false)
-              -- python_repl:send("import matplotlib.pyplot as plt", false)
-              vim.cmd("wincmd p") -- Return focus to code
-            end, 1000)
-          end
-        end
-
         -- Run current cell
         local function run_cell()
           local cell_start, cell_end = select_cell()
@@ -246,7 +232,6 @@ return {
         end
 
         -- Key mappings
-        map("n", "<leader>jr", toggle_jupyter_repl, { desc = "Toggle Jupyter REPL" })
         map("n", "<leader>jc", run_cell, { desc = "Run current cell" })
         map("n", "<leader>jl", run_selection, { desc = "Run current line" })
         map("v", "<leader>jl", run_selection, { desc = "Run selection" })
@@ -278,9 +263,22 @@ return {
           send_to_repl("plt.show()")
         end, { desc = "Show plots" })
 
+        -- Properly exit and destroy REPL
         map("n", "<leader>jx", function()
-          send_to_repl("exit()")
-        end, { desc = "Exit REPL" })
+          if python_repl:is_open() then
+            python_repl:shutdown() -- Kill process and close window
+            -- Create fresh terminal instance
+            python_repl = Terminal:new({
+              cmd = "python3",
+              dir = "git_dir",
+              direction = "vertical",
+              count = 2,
+            })
+            vim.notify("REPL terminated")
+          else
+            vim.notify("No REPL running")
+          end
+        end, { desc = "Exit and destroy REPL" })
 
         -- Notebook conversion commands
         map("n", "<leader>jw", function()
