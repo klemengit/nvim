@@ -205,13 +205,26 @@ return {
 
         local function prev_cell()
           local current_line = vim.fn.line(".")
-          for i = current_line - 1, 1, -1 do
+          local cell_markers = {}
+
+          -- Collect all cell marker positions
+          for i = 1, vim.fn.line("$") do
             if vim.fn.getline(i):match("^%s*#%s*%%%%") then
-              vim.fn.cursor(i + 1, 1)
+              table.insert(cell_markers, i)
+            end
+          end
+
+          -- Find current cell and go to previous one
+          for i = #cell_markers, 1, -1 do
+            if cell_markers[i] < current_line then
+              vim.fn.cursor(cell_markers[i] + 1, 1)
               return
             end
           end
+
+          -- No previous cell found, go to beginning
           vim.fn.cursor(1, 1)
+          vim.notify("At first cell")
         end
 
         -- Create new cell
@@ -231,6 +244,84 @@ return {
           end
         end
 
+        -- Convert .ipynb to .py file
+        map("n", "<leader>jp", function()
+          local current_file = vim.fn.expand("%:p")
+          if current_file:match("%.ipynb$") then
+            local py_file = current_file:gsub("%.ipynb$", ".py")
+            -- Use jupytext to convert with cell markers
+            local cmd = "jupytext --to py:percent --output "
+              .. vim.fn.shellescape(py_file)
+              .. " "
+              .. vim.fn.shellescape(current_file)
+            local result = vim.fn.system(cmd)
+
+            if vim.v.shell_error == 0 then
+              vim.notify("Converted to " .. vim.fn.fnamemodify(py_file, ":t"))
+              -- Optionally open the converted file
+              vim.cmd("edit " .. py_file)
+            else
+              vim.notify("Conversion failed: " .. result, vim.log.levels.ERROR)
+              vim.notify("Is jupytext installed? Try: pip install jupytext", vim.log.levels.INFO)
+            end
+          else
+            vim.notify("Not a .ipynb file", vim.log.levels.WARN)
+          end
+        end, { desc = "Convert .ipynb to .py" })
+
+        -- Run all cells in file
+        local function run_all_cells()
+          local total_lines = vim.fn.line("$")
+          local cells = {}
+          local cell_starts = { 1 } -- First cell starts at line 1
+
+          -- Find all cell boundaries in the entire file
+          for i = 1, total_lines do
+            local line = vim.fn.getline(i)
+            if line:match("^%s*#%s*%%%%") then
+              table.insert(cell_starts, i + 1)
+            end
+          end
+
+          -- Extract code from each cell
+          for i = 1, #cell_starts do
+            local cell_start = cell_starts[i]
+            local cell_end
+
+            if i < #cell_starts then
+              cell_end = cell_starts[i + 1] - 2 -- End before next cell marker
+            else
+              cell_end = total_lines -- Last cell goes to end of file
+            end
+
+            -- Skip empty lines at start and end
+            while cell_start <= cell_end and vim.fn.getline(cell_start):match("^%s*$") do
+              cell_start = cell_start + 1
+            end
+            while cell_end >= cell_start and vim.fn.getline(cell_end):match("^%s*$") do
+              cell_end = cell_end - 1
+            end
+
+            if cell_start <= cell_end then
+              local lines = vim.api.nvim_buf_get_lines(0, cell_start - 1, cell_end, false)
+              local code = table.concat(lines, "\n")
+              if code:match("%S") then -- Only add non-empty cells
+                table.insert(cells, code)
+              end
+            end
+          end
+
+          -- Run all cells
+          if #cells > 0 then
+            vim.notify("Running " .. #cells .. " cells in file...")
+            local combined_code = table.concat(cells, "\n\n")
+            send_to_repl(combined_code, true) -- Use ensure_ready=true
+            vim.notify("✓ Executed " .. #cells .. " cells")
+          else
+            vim.notify("No cells found in file")
+          end
+        end
+
         -- Key mappings
         map("n", "<leader>jc", run_cell, { desc = "Run current cell" })
         map("n", "<leader>jl", run_selection, { desc = "Run current line" })
@@ -238,10 +329,11 @@ return {
         map("n", "<leader>jn", create_cell_below, { desc = "Create cell below" })
         map("n", "<leader>ja", run_cells_above, { desc = "Run all cells above" })
         map("n", "<leader>jt", smart_toggle_repl, { desc = "Toggle REPL visibility" })
+        map("n", "<leader>jf", run_all_cells, { desc = "Run all cells in file" })
 
         -- Navigation
-        map("n", "]]", next_cell, { desc = "Next cell" })
-        map("n", "[[", prev_cell, { desc = "Previous cell" })
+        map("n", "<leader>jj", next_cell, { desc = "Next cell" })
+        map("n", "<leader>jk", prev_cell, { desc = "Previous cell" })
 
         -- Cell text object
         map("o", "ic", function()
@@ -296,8 +388,18 @@ return {
       end
 
       -- Auto-setup for Python files
+      -- vim.api.nvim_create_autocmd("FileType", {
+      --   pattern = "python",
+      --   callback = setup_jupyter_keymaps,
+      -- })
+      -- Auto-setup for Python and Jupyter files
       vim.api.nvim_create_autocmd("FileType", {
         pattern = "python",
+        callback = setup_jupyter_keymaps,
+      })
+
+      vim.api.nvim_create_autocmd({ "BufRead", "BufNewFile" }, {
+        pattern = "*.ipynb",
         callback = setup_jupyter_keymaps,
       })
     end,
