@@ -19,14 +19,7 @@ return {
       })
 
       local Terminal = require("toggleterm.terminal").Terminal
-      -- local python_repl = Terminal:new({
-      --   cmd = "python3",
-      --   dir = "git_dir",
-      --   direction = "vertical",
-      --   count = 2,
-      -- })
       local python_repl = Terminal:new({
-        -- cmd = "ipython --no-banner --no-confirm-exit --colors=NoColor",
         cmd = "ipython --no-banner --automagic --colors=Linux",
         dir = "git_dir",
         direction = "vertical",
@@ -75,34 +68,6 @@ return {
 
           return cell_start, cell_end
         end
-
-        -- Send text to Python REPL
-        -- local function send_to_repl(text, ensure_ready)
-        --   if not python_repl:is_open() then
-        --     python_repl:open()
-        --     if ensure_ready then
-        --       -- Wait for full initialization (for multiple commands)
-        --       vim.defer_fn(function()
-        --         python_repl:send("import numpy as np", false)
-        --         python_repl:send("import pandas as pd", false)
-        --         python_repl:send("import matplotlib.pyplot as plt", false)
-        --         vim.defer_fn(function()
-        --           python_repl:send(text, false)
-        --           vim.cmd("wincmd p")
-        --         end, 500)
-        --       end, 1000)
-        --     else
-        --       -- Quick initialization for single commands
-        --       vim.defer_fn(function()
-        --         python_repl:send(text, false)
-        --         vim.cmd("wincmd p")
-        --       end, 500)
-        --     end
-        --   else
-        --     python_repl:send(text, false)
-        --     vim.cmd("wincmd p")
-        --   end
-        -- end
 
         -- Enhanced send_to_repl with IPython support and indentation handling
         local function send_to_repl(text, ensure_ready)
@@ -417,7 +382,6 @@ return {
             python_repl:shutdown() -- Kill process and close window
             -- Create fresh terminal instance
             python_repl = Terminal:new({
-              -- cmd = "ipython --no-banner --no-confirm-exit --colors=NoColor",
               cmd = "ipython --no-banner --automagic --colors=Linux",
               dir = "git_dir",
               direction = "vertical",
