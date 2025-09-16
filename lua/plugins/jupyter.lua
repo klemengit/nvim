@@ -417,11 +417,13 @@ return {
             python_repl:shutdown() -- Kill process and close window
             -- Create fresh terminal instance
             python_repl = Terminal:new({
-              cmd = "python3",
+              -- cmd = "ipython --no-banner --no-confirm-exit --colors=NoColor",
+              cmd = "ipython --no-banner --automagic --colors=Linux",
               dir = "git_dir",
               direction = "vertical",
               count = 2,
             })
+
             vim.notify("REPL terminated")
           else
             vim.notify("No REPL running")
