@@ -19,8 +19,15 @@ return {
       })
 
       local Terminal = require("toggleterm.terminal").Terminal
+      -- local python_repl = Terminal:new({
+      --   cmd = "python3",
+      --   dir = "git_dir",
+      --   direction = "vertical",
+      --   count = 2,
+      -- })
       local python_repl = Terminal:new({
-        cmd = "python3",
+        -- cmd = "ipython --no-banner --no-confirm-exit --colors=NoColor",
+        cmd = "ipython --no-banner --automagic --colors=Linux",
         dir = "git_dir",
         direction = "vertical",
         count = 2,
@@ -70,33 +77,82 @@ return {
         end
 
         -- Send text to Python REPL
+        -- local function send_to_repl(text, ensure_ready)
+        --   if not python_repl:is_open() then
+        --     python_repl:open()
+        --     if ensure_ready then
+        --       -- Wait for full initialization (for multiple commands)
+        --       vim.defer_fn(function()
+        --         python_repl:send("import numpy as np", false)
+        --         python_repl:send("import pandas as pd", false)
+        --         python_repl:send("import matplotlib.pyplot as plt", false)
+        --         vim.defer_fn(function()
+        --           python_repl:send(text, false)
+        --           vim.cmd("wincmd p")
+        --         end, 500)
+        --       end, 1000)
+        --     else
+        --       -- Quick initialization for single commands
+        --       vim.defer_fn(function()
+        --         python_repl:send(text, false)
+        --         vim.cmd("wincmd p")
+        --       end, 500)
+        --     end
+        --   else
+        --     python_repl:send(text, false)
+        --     vim.cmd("wincmd p")
+        --   end
+        -- end
+
+        -- Enhanced send_to_repl with IPython support and indentation handling
         local function send_to_repl(text, ensure_ready)
+          -- Clean up text and ensure proper block completion for IPython
+          local lines = vim.split(text, "\n")
+          local processed_lines = {}
+          local has_indented_content = false
+
+          -- Process each line
+          for _, line in ipairs(lines) do
+            table.insert(processed_lines, line)
+            if line:match("^%s+%S") then -- Line starts with whitespace and has content
+              has_indented_content = true
+            end
+          end
+
+          local processed_text = table.concat(processed_lines, "\n")
+
+          -- Add extra newline for indented blocks to ensure execution
+          if has_indented_content then
+            processed_text = processed_text .. "\n"
+          end
+
           if not python_repl:is_open() then
             python_repl:open()
             if ensure_ready then
-              -- Wait for full initialization (for multiple commands)
+              -- Wait for IPython to fully initialize
               vim.defer_fn(function()
+                -- Load common imports with IPython magic
                 python_repl:send("import numpy as np", false)
                 python_repl:send("import pandas as pd", false)
                 python_repl:send("import matplotlib.pyplot as plt", false)
+                python_repl:send("%matplotlib inline", false) -- Enable inline plots
                 vim.defer_fn(function()
-                  python_repl:send(text, false)
+                  python_repl:send(processed_text, false)
                   vim.cmd("wincmd p")
                 end, 500)
               end, 1000)
             else
               -- Quick initialization for single commands
               vim.defer_fn(function()
-                python_repl:send(text, false)
+                python_repl:send(processed_text, false)
                 vim.cmd("wincmd p")
               end, 500)
             end
           else
-            python_repl:send(text, false)
+            python_repl:send(processed_text, false)
             vim.cmd("wincmd p")
           end
         end
-
         -- Run current cell
         local function run_cell()
           local cell_start, cell_end = select_cell()
