@@ -70,44 +70,113 @@ return {
         end
 
         -- Enhanced send_to_repl with IPython support and indentation handling
-        local function send_to_repl(text, ensure_ready)
-          -- Clean up text and ensure proper block completion for IPython
-          local lines = vim.split(text, "\n")
-          local processed_lines = {}
-          local has_indented_content = false
+        -- local function send_to_repl(text, ensure_ready)
+        --   -- Clean up text and ensure proper block completion for IPython
+        --   local lines = vim.split(text, "\n")
+        --   local processed_lines = {}
+        --   local has_indented_content = false
+        --
+        --   -- Process each line
+        --   for _, line in ipairs(lines) do
+        --     table.insert(processed_lines, line)
+        --     if line:match("^%s+%S") then -- Line starts with whitespace and has content
+        --       has_indented_content = true
+        --     end
+        --   end
+        --
+        --   local processed_text = table.concat(processed_lines, "\n")
+        --
+        --   -- Add extra newline for indented blocks to ensure execution
+        --   if has_indented_content then
+        --     processed_text = processed_text .. "\n"
+        --   end
+        --
+        --   if not python_repl:is_open() then
+        --     python_repl:open()
+        --     if ensure_ready then
+        --       -- Wait for IPython to fully initialize
+        --       vim.defer_fn(function()
+        --         -- Load common imports with IPython magic
+        --         python_repl:send("import numpy as np", false)
+        --         python_repl:send("import pandas as pd", false)
+        --         python_repl:send("import matplotlib.pyplot as plt", false)
+        --         python_repl:send("%matplotlib inline", false) -- Enable inline plots
+        --         vim.defer_fn(function()
+        --           python_repl:send(processed_text, false)
+        --           vim.cmd("wincmd p")
+        --         end, 500)
+        --       end, 1000)
+        --     else
+        --       -- Quick initialization for single commands
+        --       vim.defer_fn(function()
+        --         python_repl:send(processed_text, false)
+        --         vim.cmd("wincmd p")
+        --       end, 500)
+        --     end
+        --   else
+        --     python_repl:send(processed_text, false)
+        --     vim.cmd("wincmd p")
+        --   end
+        -- end
 
-          -- Process each line
+        -- Enhanced send_to_repl with robust indentation handling for IPython
+        local function send_to_repl(text, ensure_ready)
+          -- Normalize and clean up the text
+          local lines = vim.split(text, "\n")
+          local cleaned_lines = {}
+          local min_indent = math.huge
+          local has_content = false
+
+          -- First pass: find minimum indentation level (excluding empty lines)
           for _, line in ipairs(lines) do
-            table.insert(processed_lines, line)
-            if line:match("^%s+%S") then -- Line starts with whitespace and has content
-              has_indented_content = true
+            if line:match("%S") then -- Line has non-whitespace content
+              has_content = true
+              local indent = line:match("^%s*"):len()
+              if indent < min_indent then
+                min_indent = indent
+              end
             end
           end
 
-          local processed_text = table.concat(processed_lines, "\n")
+          -- Second pass: normalize indentation and clean lines
+          if has_content and min_indent < math.huge then
+            for _, line in ipairs(lines) do
+              if line:match("%S") then
+                -- Remove the minimum indentation from all lines
+                local normalized = line:sub(min_indent + 1)
+                table.insert(cleaned_lines, normalized)
+              elseif #cleaned_lines > 0 then
+                -- Preserve empty lines within the block
+                table.insert(cleaned_lines, "")
+              end
+            end
+          else
+            -- No content or no indentation, use lines as-is
+            cleaned_lines = lines
+          end
 
-          -- Add extra newline for indented blocks to ensure execution
-          if has_indented_content then
+          -- Join lines and add completion newline for blocks
+          local processed_text = table.concat(cleaned_lines, "\n")
+
+          -- Add extra newline if the text contains Python block structures
+          if processed_text:match(":%s*\n") or processed_text:match("^%s+") then
             processed_text = processed_text .. "\n"
           end
 
           if not python_repl:is_open() then
             python_repl:open()
             if ensure_ready then
-              -- Wait for IPython to fully initialize
               vim.defer_fn(function()
-                -- Load common imports with IPython magic
                 python_repl:send("import numpy as np", false)
                 python_repl:send("import pandas as pd", false)
                 python_repl:send("import matplotlib.pyplot as plt", false)
-                python_repl:send("%matplotlib inline", false) -- Enable inline plots
+                python_repl:send("%matplotlib inline", false)
                 vim.defer_fn(function()
                   python_repl:send(processed_text, false)
                   vim.cmd("wincmd p")
                 end, 500)
               end, 1000)
             else
-              -- Quick initialization for single commands
               vim.defer_fn(function()
                 python_repl:send(processed_text, false)
                 vim.cmd("wincmd p")
@@ -118,6 +187,7 @@ return {
             vim.cmd("wincmd p")
           end
         end
+
         -- Run current cell
         local function run_cell()
           local cell_start, cell_end = select_cell()
