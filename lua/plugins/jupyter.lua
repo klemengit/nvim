@@ -1,6 +1,9 @@
 -- Simplified Jupyter-like setup using only toggleterm
 -- Place in ~/.config/nvim/lua/plugins/jupyter-simple.lua
 
+if true then
+  return {}
+end
 return {
   {
     "akinsho/toggleterm.nvim",
