@@ -119,6 +119,26 @@ return {
           end
         end
 
+        -- Run current cell
+        local function run_cell()
+          local cell_start, cell_end = select_cell()
+          if cell_start <= cell_end then
+            local lines = vim.api.nvim_buf_get_lines(0, cell_start - 1, cell_end, false)
+            local code = table.concat(lines, "\n")
+            send_to_repl(code)
+
+            -- Move to next cell
+            local current_line = vim.fn.line(".")
+            for i = current_line + 1, vim.fn.line("$") do
+              local line = vim.fn.getline(i)
+              if line:match("^%s*#%s*%%%%") then
+                vim.fn.cursor(i + 1, 1)
+                break
+              end
+            end
+          end
+        end
+
         -- Run all cells above current position
         local function run_cells_above()
           local current_line = vim.fn.line(".")
