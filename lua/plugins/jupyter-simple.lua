@@ -50,6 +50,7 @@ return {
           python_repl:open()
         end
         if not repl_ready then
+          vim.loop.sleep(500)
           -- Send init PLAIN (no bracketed paste) to avoid raw markers on first send
           local init_cmds = table.concat({
             -- "import sys, os",
@@ -189,6 +190,7 @@ return {
           python_repl:close() -- hides, keeps process
         else
           python_repl:open()
+          vim.cmd("wincmd p")
         end
       end
 
@@ -333,6 +335,12 @@ return {
           ensure_repl_ready()
           python_repl:send("%reset -f\n", false)
         end, { desc = "IPython reset (keep session)" })
+        map("n", "<leader>jr", function()
+          ensure_repl_ready()
+          -- Use IPython magic to clear the terminal
+          python_repl:send("%clear\n", false)
+          vim.cmd("wincmd p")
+        end, { desc = "Clear IPython screen" })
 
         map("n", "<leader>jx", function()
           if python_repl:is_open() then
