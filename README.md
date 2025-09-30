@@ -1,6 +1,7 @@
 # 💤 LazyVim Neovim Configuration
 
-A reproducible Neovim configuration based on [LazyVim](https://github.com/LazyVim/LazyVim) with cross-platform support and automated setup.
+A reproducible Neovim configuration based on [LazyVim](https://github.com/LazyVim/LazyVim) with
+cross-platform support and automated setup.
 
 ## 🚀 Quick Installation
 
@@ -14,11 +15,13 @@ git clone <your-repo-url> ~/.config/nvim
 ## 📋 Prerequisites
 
 ### Required
+
 - **Neovim >= 0.9.0** (recommended: 0.10.0+)
 - **Git** (for plugin management)
 - **A terminal with true color support**
 
 ### Optional (for full functionality)
+
 - **LaTeX distribution** (for VimTeX plugin)
   - Linux: `sudo apt install texlive-full` or `sudo pacman -S texlive-most`
   - macOS: Install MacTeX from [tug.org/mactex](https://tug.org/mactex/)
@@ -31,7 +34,9 @@ git clone <your-repo-url> ~/.config/nvim
 ## 🛠 Manual Installation
 
 ### 1. Install Neovim
+
 #### Linux (Ubuntu/Debian)
+
 ```bash
 sudo add-apt-repository ppa:neovim-ppa/unstable
 sudo apt update
@@ -39,22 +44,27 @@ sudo apt install neovim
 ```
 
 #### Linux (Arch)
+
 ```bash
 sudo pacman -S neovim
 ```
 
 #### macOS
+
 ```bash
 brew install neovim
 ```
 
 #### Windows
+
 Download from [neovim.io](https://neovim.io/) or use Chocolatey:
+
 ```powershell
 choco install neovim
 ```
 
 ### 2. Clone Configuration
+
 ```bash
 # Backup existing config (if any)
 mv ~/.config/nvim ~/.config/nvim.backup
@@ -69,6 +79,7 @@ cd ~/.config/nvim
 The configuration uses Mason for LSP management, but some servers need manual installation:
 
 #### Python Development
+
 ```bash
 # Install Pyright LSP (required for Python support)
 # This must be done inside Neovim:
@@ -77,6 +88,7 @@ nvim
 ```
 
 #### Node.js Development
+
 ```bash
 # Install Node.js LSP
 nvim
@@ -84,6 +96,7 @@ nvim
 ```
 
 #### Other Languages
+
 ```bash
 # Inside Neovim, install servers for your languages:
 :Mason
@@ -91,11 +104,13 @@ nvim
 ```
 
 ### 4. First Launch
+
 ```bash
 nvim
 ```
 
 On first launch:
+
 1. Lazy.nvim will automatically install all plugins
 2. Wait for installation to complete
 3. Restart Neovim: `:q` then `nvim`
@@ -136,6 +151,7 @@ On first launch:
 ## 🔍 Troubleshooting
 
 ### Plugin Issues
+
 ```bash
 # Clear plugin cache and reinstall
 rm -rf ~/.local/share/nvim
@@ -143,6 +159,7 @@ nvim
 ```
 
 ### LSP Not Working
+
 ```bash
 # Check LSP status
 :LspInfo
@@ -153,6 +170,7 @@ nvim
 ```
 
 ### LaTeX/VimTeX Issues
+
 ```bash
 # Check if LaTeX is installed
 latex --version
@@ -163,6 +181,7 @@ which skim    # macOS
 ```
 
 ### Performance Issues
+
 ```bash
 # Profile startup time
 nvim --startuptime startup.log
