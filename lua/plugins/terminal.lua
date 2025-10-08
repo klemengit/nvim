@@ -3,11 +3,11 @@ return {
     "folke/snacks.nvim",
     keys = {
       {
-        "<C-S-/>",
+        "<A-t>",
         function()
           Snacks.terminal()
         end,
-        mode = { "n", "t" },
+        mode = { "n", "i", "t" },
         desc = "Toggle Terminal",
       },
     },
