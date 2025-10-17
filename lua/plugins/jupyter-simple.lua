@@ -185,6 +185,7 @@ return {
         vim.fn.setline(".", "# ----------------------------------------------------------------------")
         vim.cmd("normal! o")
         vim.cmd("normal! x")
+        vim.cmd("normal! o")
         vim.cmd("startinsert")
       end
 
