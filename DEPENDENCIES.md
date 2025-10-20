@@ -283,4 +283,3 @@ echo "test" | nvim -c 'put +' -c 'wq'
 # Install clipboard provider
 # See clipboard support section above
 ```
-
