@@ -46,3 +46,14 @@ local function activate_venv()
 end
 
 vim.api.nvim_create_user_command("ActivateVenv", activate_venv, {})
+
+-- Disable the 'q' register for macro recording
+vim.api.nvim_create_autocmd("RecordingEnter", {
+  callback = function()
+    local reg = vim.fn.reg_recording()
+    if reg == "q" then
+      vim.cmd("normal! q") -- Stop recording immediately
+      vim.notify('Recording to register "q" is disabled', vim.log.levels.WARN)
+    end
+  end,
+})
