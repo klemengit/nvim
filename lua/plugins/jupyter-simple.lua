@@ -152,7 +152,7 @@ return {
         local last = vim.fn.line("$")
         for i = cur + 1, last do
           if is_cell_marker(vim.fn.getline(i)) then
-            vim.fn.cursor(i + 1, 1)
+            vim.fn.cursor(i + 2, 1)
             return
           end
         end
@@ -169,7 +169,7 @@ return {
         end
         for i = #marks, 1, -1 do
           if marks[i] < cur then
-            vim.fn.cursor(marks[i] + 1, 1)
+            vim.fn.cursor(marks[i] + 0, 1)
             return
           end
         end
