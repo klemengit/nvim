@@ -202,22 +202,21 @@ return {
       -- Runners
       -- -------------
 
-      local function run_cell()
+      local function run_cell(move_to_next)
+        move_to_next = move_to_next or false
         local s, e = select_cell()
         if s <= e then
           local lines = vim.api.nvim_buf_get_lines(0, s - 1, e, false)
           local code = table.concat(lines, "\n")
           send_to_repl(code)
-          -- move to next
-          local cur = vim.fn.line(".")
-          local last = vim.fn.line("$")
-          for i = cur + 1, last do
-            if is_cell_marker(vim.fn.getline(i)) then
-              vim.fn.cursor(i + 1, 1)
-              break
-            end
+          if move_to_next then
+            next_cell()
           end
         end
+      end
+
+      local function run_cell_move_to_next()
+        run_cell(true)
       end
 
       local function run_cells_above()
@@ -322,7 +321,8 @@ return {
         local map = vim.keymap.set
 
         -- Exec
-        map("n", "<leader>jc", run_cell, { desc = "Run current cell" })
+        map("n", "<leader>jc", run_cell_move_to_next, { desc = "Run current cell and move to next cell" })
+        map("n", "<leader>jC", run_cell, { desc = "Run current cell and stay put" })
         map("n", "<leader>jl", run_selection_or_line, { desc = "Run current line" })
         map("v", "<leader>jl", run_selection_or_line, { desc = "Run selection" })
         map("n", "<leader>ja", run_cells_above, { desc = "Run all cells above" })
