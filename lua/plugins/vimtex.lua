@@ -1,6 +1,6 @@
 return {
   "lervag/vimtex",
-  lazy = false,
+  lazy = true,
   init = function()
     -- Ensure filetype detection + LaTeX flavor
     vim.g.do_filetype_lua = 1
