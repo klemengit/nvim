@@ -2,6 +2,9 @@
 -- Default options that are always set: https://github.com/LazyVim/LazyVim/blob/main/lua/lazyvim/config/options.lua
 -- Add any additional options here
 
+-- Disable smooth scrolling (causes laggy Ctrl+d/Ctrl+u)
+vim.g.snacks_animate = false
+
 -- Fixed Neovim server socket (works across sessions)
 local sock = vim.fn.stdpath("run") .. "/nvim.sock" -- usually ~/.local/state/nvim/nvim.sock
 vim.g.nvim_listen_address = sock
