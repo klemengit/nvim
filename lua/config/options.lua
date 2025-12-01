@@ -5,6 +5,9 @@
 -- Disable smooth scrolling (causes laggy Ctrl+d/Ctrl+u)
 vim.g.snacks_animate = false
 
+-- Disable autoformat on save by default
+vim.g.autoformat = false
+
 -- Fixed Neovim server socket (works across sessions)
 local sock = vim.fn.stdpath("run") .. "/nvim.sock" -- usually ~/.local/state/nvim/nvim.sock
 vim.g.nvim_listen_address = sock
