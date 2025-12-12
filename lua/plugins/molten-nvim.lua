@@ -60,8 +60,36 @@ return {
       { "<leader>mk", function() require("notebook-navigator").move_cell("u") end, desc = "Previous cell" },
       { "<leader>mc", "<cmd>lua require('notebook-navigator').run_and_move()<cr>", desc = "Run cell and move" },
       { "<leader>mC", "<cmd>lua require('notebook-navigator').run_cell()<cr>", desc = "Run cell" },
+      { 
+        "<leader>ma", 
+        function()
+          -- Save cursor position (line number)
+          local target_line = vim.api.nvim_win_get_cursor(0)[1]
+          
+          -- Go to top of file
+          vim.cmd("normal! gg")
+          
+          -- Run cells until we reach the target
+          while true do
+            -- Run current cell and move to next
+            require('notebook-navigator').run_and_move()
+            vim.cmd("sleep 100m")
+
+            local current_line = vim.api.nvim_win_get_cursor(0)[1]
+            
+            -- If we've passed the target cell, we're done
+            if current_line >= target_line then
+              break
+            end
+          end
+          
+          -- Restore cursor position
+          vim.api.nvim_win_set_cursor(0, {target_line, 0})
+        end,
+        desc = "Run all cells above (including current)" 
+      },
       { "<leader>mi", ":MoltenInit<CR>", desc = "Initialize molten" },
-      { "<leader>mx", ":MoltenDeinit<CR>", desc = "Initialize molten" },
+      { "<leader>mx", ":MoltenDeinit<CR>", desc = "Deinitialize molten" },
     },
     dependencies = {
       "benlubas/molten-nvim",
