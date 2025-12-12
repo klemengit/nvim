@@ -40,7 +40,7 @@ return {
     build = ":UpdateRemotePlugins",
     init = function()
       vim.g.molten_output_win_max_height = 20
-      vim.g.molten_auto_open_output = false
+      vim.g.molten_auto_open_output = true
       -- Auto-detect terminal and set image provider accordingly
       if vim.env.TERM == "xterm-kitty" or vim.env.TERM_PROGRAM == "WezTerm" then
         vim.g.molten_image_provider = "image.nvim"
@@ -56,8 +56,8 @@ return {
   {
     "GCBallesteros/NotebookNavigator.nvim",
     keys = {
-      { "]h", function() require("notebook-navigator").move_cell("d") end, desc = "Next cell" },
-      { "[h", function() require("notebook-navigator").move_cell("u") end, desc = "Previous cell" },
+      { "<leader>mj", function() require("notebook-navigator").move_cell("d") end, desc = "Next cell" },
+      { "<leader>mk", function() require("notebook-navigator").move_cell("u") end, desc = "Previous cell" },
       { "<leader>mc", "<cmd>lua require('notebook-navigator').run_and_move()<cr>", desc = "Run cell and move" },
       { "<leader>mC", "<cmd>lua require('notebook-navigator').run_cell()<cr>", desc = "Run cell" },
       { "<leader>mi", ":MoltenInit<CR>", desc = "Initialize molten" },
@@ -91,7 +91,7 @@ return {
         },
       },
       max_width = 100,
-      max_height = 12,
+      max_height = 100,
       max_height_window_percentage = math.huge,
       max_width_window_percentage = math.huge,
       window_overlap_clear_enabled = true,
