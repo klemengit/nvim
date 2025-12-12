@@ -61,6 +61,7 @@ return {
       { "<leader>mc", "<cmd>lua require('notebook-navigator').run_and_move()<cr>", desc = "Run cell and move" },
       { "<leader>mC", "<cmd>lua require('notebook-navigator').run_cell()<cr>", desc = "Run cell" },
       { "<leader>mi", ":MoltenInit<CR>", desc = "Initialize molten" },
+      { "<leader>mx", ":MoltenDeinit<CR>", desc = "Initialize molten" },
     },
     dependencies = {
       "benlubas/molten-nvim",
