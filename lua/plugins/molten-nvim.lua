@@ -39,7 +39,8 @@ return {
     version = "^1.0.0",
     build = ":UpdateRemotePlugins",
     init = function()
-      vim.g.molten_output_win_max_height = 20
+      vim.g.molten_output_win_max_height = 50
+      vim.g.molten_virt_text_max_lines = 20
       vim.g.molten_auto_open_output = true
       -- Auto-detect terminal and set image provider accordingly
       if vim.env.TERM == "xterm-kitty" or vim.env.TERM_PROGRAM == "WezTerm" then
@@ -49,6 +50,7 @@ return {
       end
       vim.g.molten_wrap_output = true
       vim.g.molten_virt_text_output = true
+      vim.g.molten_enter_output_behavior = "open_and_enter"
     end,
   },
 
@@ -90,6 +92,13 @@ return {
       },
       { "<leader>mi", ":MoltenInit<CR>", desc = "Initialize molten" },
       { "<leader>mx", ":MoltenDeinit<CR>", desc = "Deinitialize molten" },
+      { "<leader>mo", ":MoltenShowOutput<CR>", desc = "Show output window" },
+      { "<leader>mh", ":MoltenHideOutput<CR>", desc = "Hide output window" },
+      { "<localleader>mr", ":MoltenRestart<CR>", desc = "Restart Kernel" },
+      { "<localleader>mi", ":MoltenInterrupt<CR>", desc = "Interrup kernel" },
+      { "<leader>mb", ":MoltenOpenInBrowser<CR>", desc = "Open output in browser" },
+      vim.keymap.set("n", "<leader>me", ":noautocmd MoltenEnterOutput<CR>",
+          { silent = true, desc = "show/enter output" })
     },
     dependencies = {
       "benlubas/molten-nvim",
