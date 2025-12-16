@@ -57,3 +57,46 @@ vim.api.nvim_create_autocmd("RecordingEnter", {
     end
   end,
 })
+
+-- disable the automatic commenting when pressing `o` in a commented line
+vim.api.nvim_create_autocmd("FileType", {
+  pattern = "*",
+  callback = function()
+    -- vim.opt_local.formatoptions:remove({ "o", "r" }) -- Also disable continuing the comment when pressing Enter in insert mode.
+    vim.opt_local.formatoptions:remove({ "o" })
+  end,
+})
+
+-- ---------------------------------------------------------------------------
+-- Add a visual separator to the notebook cells (molten)
+local function update_cell_separators()
+  local ns = vim.api.nvim_create_namespace("molten_cells")
+  vim.api.nvim_buf_clear_namespace(0, ns, 0, -1)
+  
+  for i = 1, vim.api.nvim_buf_line_count(0) do
+    local line = vim.api.nvim_buf_get_lines(0, i-1, i, false)[1]
+    if line and line:match("^# %%") then
+      vim.api.nvim_buf_set_extmark(0, ns, i-1, 0, {
+        virt_lines = { { { string.rep("─", 80), "Comment" } } },
+        virt_lines_above = true,
+      })
+    end
+  end
+end
+
+local timer = nil
+vim.api.nvim_create_autocmd({"TextChanged", "TextChangedI"}, {
+  pattern = "*.py",
+  callback = function()
+    if timer then
+      vim.fn.timer_stop(timer)
+    end
+    timer = vim.fn.timer_start(100, update_cell_separators)
+  end,
+})
+
+vim.api.nvim_create_autocmd({"FileType", "BufEnter"}, {
+  pattern = "*.py",
+  callback = update_cell_separators,
+})
+-- ---------------------------------------------------------------------------

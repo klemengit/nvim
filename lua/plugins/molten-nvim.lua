@@ -41,7 +41,7 @@ return {
     init = function()
       vim.g.molten_output_win_max_height = 50
       vim.g.molten_virt_text_max_lines = 20
-      vim.g.molten_auto_open_output = true
+      vim.g.molten_auto_open_output = false
       -- Auto-detect terminal and set image provider accordingly
       if vim.env.TERM == "xterm-kitty" or vim.env.TERM_PROGRAM == "WezTerm" then
         vim.g.molten_image_provider = "image.nvim"
@@ -60,6 +60,7 @@ return {
     keys = {
       { "<leader>mj", function() require("notebook-navigator").move_cell("d") end, desc = "Next cell" },
       { "<leader>mk", function() require("notebook-navigator").move_cell("u") end, desc = "Previous cell" },
+      { "<leader>md", function() require("notebook-navigator").add_cell_below() end, desc = "Add cell bellow" },
       { "<leader>mc", "<cmd>lua require('notebook-navigator').run_and_move()<cr>", desc = "Run cell and move" },
       { "<leader>mC", "<cmd>lua require('notebook-navigator').run_cell()<cr>", desc = "Run cell" },
       { 
@@ -98,7 +99,7 @@ return {
       { "<localleader>mi", ":MoltenInterrupt<CR>", desc = "Interrup kernel" },
       { "<leader>mb", ":MoltenOpenInBrowser<CR>", desc = "Open output in browser" },
       vim.keymap.set("n", "<leader>me", ":noautocmd MoltenEnterOutput<CR>",
-          { silent = true, desc = "show/enter output" })
+          { silent = true, desc = "show/enter output" }),
     },
     dependencies = {
       "benlubas/molten-nvim",
