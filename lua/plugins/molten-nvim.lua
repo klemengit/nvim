@@ -41,7 +41,7 @@ return {
     init = function()
       vim.g.molten_output_win_max_height = 50
       vim.g.molten_virt_text_max_lines = 20
-      vim.g.molten_auto_open_output = false
+      vim.g.molten_auto_open_output = true
       -- Auto-detect terminal and set image provider accordingly
       if vim.env.TERM == "xterm-kitty" or vim.env.TERM_PROGRAM == "WezTerm" then
         vim.g.molten_image_provider = "image.nvim"
