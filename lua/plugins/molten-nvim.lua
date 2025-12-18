@@ -51,6 +51,7 @@ return {
       vim.g.molten_wrap_output = true
       vim.g.molten_virt_text_output = true
       vim.g.molten_enter_output_behavior = "open_and_enter"
+      -- vim.g.molten_cover_empty_lines = true
     end,
   },
 
@@ -98,6 +99,16 @@ return {
       { "<localleader>mr", ":MoltenRestart<CR>", desc = "Restart Kernel" },
       { "<localleader>mi", ":MoltenInterrupt<CR>", desc = "Interrup kernel" },
       { "<leader>mb", ":MoltenOpenInBrowser<CR>", desc = "Open output in browser" },
+      { "<leader>ml", ":MoltenEvaluateLine<CR>", desc = "Evaluate this line" },
+      { "<leader>mv", ":<C-u>MoltenEvaluateVisual<CR>", desc = "Evaluate visual", mode = "v" },
+      { "<leader>mn",
+        function()
+          vim.cmd("normal! o")
+          vim.fn.setline(".", "# %%")
+          vim.cmd("normal! o")
+        end,
+        desc = "Add cell marker below"
+      },
       vim.keymap.set("n", "<leader>me", ":noautocmd MoltenEnterOutput<CR>",
           { silent = true, desc = "show/enter output" }),
     },

@@ -77,7 +77,7 @@ local function update_cell_separators()
     local line = vim.api.nvim_buf_get_lines(0, i-1, i, false)[1]
     if line and line:match("^# %%") then
       vim.api.nvim_buf_set_extmark(0, ns, i-1, 0, {
-        virt_lines = { { { string.rep("─", 80), "Comment" } } },
+        virt_lines = { { { string.rep("─", 500), "Comment" } } },
         virt_lines_above = true,
       })
     end
@@ -91,7 +91,7 @@ vim.api.nvim_create_autocmd({"TextChanged", "TextChangedI"}, {
     if timer then
       vim.fn.timer_stop(timer)
     end
-    timer = vim.fn.timer_start(100, update_cell_separators)
+    timer = vim.fn.timer_start(500, update_cell_separators)
   end,
 })
 
