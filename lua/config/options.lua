@@ -15,3 +15,5 @@ if vim.fn.exists("*serverstart") == 1 then
   pcall(vim.fn.serverstart, sock) -- harmless if already running
 end
 vim.env.NVIM_LISTEN_ADDRESS = sock
+
+vim.opt.swapfile = false
