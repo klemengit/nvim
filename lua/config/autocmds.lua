@@ -86,7 +86,7 @@ end
 
 local timer = nil
 vim.api.nvim_create_autocmd({"TextChanged", "TextChangedI"}, {
-  pattern = "*.py",
+  pattern = {"*.py", "*.ipynb"},
   callback = function()
     if timer then
       vim.fn.timer_stop(timer)
@@ -95,8 +95,13 @@ vim.api.nvim_create_autocmd({"TextChanged", "TextChangedI"}, {
   end,
 })
 
-vim.api.nvim_create_autocmd({"FileType", "BufEnter"}, {
-  pattern = "*.py",
+vim.api.nvim_create_autocmd({"BufEnter"}, {
+  pattern = {"*.py", "*.ipynb"},
+  callback = update_cell_separators,
+})
+
+vim.api.nvim_create_autocmd({"FileType"}, {
+  pattern = {"python", "ipynb"},
   callback = update_cell_separators,
 })
 -- ---------------------------------------------------------------------------
