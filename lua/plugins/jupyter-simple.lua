@@ -1,9 +1,11 @@
 -- Jupyter-like workflow using toggleterm + IPython (robust block sending)
--- Drop-in replacement with fixes for duplicated prompts & raw bracketed markers.
+-- Navigation and cell text objects are delegated to NotebookNavigator + mini.ai.
+-- Each file gets its own IPython REPL instance (like per-notebook kernels).
 
 return {
   {
     "akinsho/toggleterm.nvim",
+    dependencies = { "GCBallesteros/NotebookNavigator.nvim" },
     config = function()
       require("toggleterm").setup({
         size = function(term)
@@ -23,45 +25,76 @@ return {
       -- Config: force cpaste if your terminal doesn't support bracketed paste
       vim.g.jupyter_use_cpaste = vim.g.jupyter_use_cpaste or false
 
-      -- One place for the cell marker
+      -- Cell marker pattern for bulk runners (run_cells_above, run_all_cells)
       local CELL_MARK = "^%s*#%s*%%%%"
 
-      -- Build IPython command (customize if you want venv detection)
+      -- Build IPython command
       local function ipython_cmd()
         return "ipython --no-banner --automagic --colors=Linux"
-        -- Or auto-activate venv (login shell):
-        -- return [[bash -lc 'if [ -n "$VIRTUAL_ENV" ]; then source "$VIRTUAL_ENV/bin/activate"; fi; ipython --no-banner --automagic --colors=Linux']]
       end
 
-      -- Single REPL instance we keep alive between opens/closes
-      local python_repl = Terminal:new({
-        cmd = ipython_cmd(),
-        dir = "git_dir",
-        direction = "vertical",
-        count = 2,
-      })
+      -- Per-file REPL registry: filepath -> { term = Terminal, initialized = bool }
+      local repls = {}
+      local next_count = 2
 
-      -- Track whether we've run our one-time init in this process
-      local repl_ready = false
+      local function current_filepath()
+        return vim.fn.expand("%:p")
+      end
 
-      -- Ensure REPL open + initialized exactly once per process
+      local function get_repl(filepath)
+        filepath = filepath or current_filepath()
+        if not repls[filepath] then
+          repls[filepath] = {
+            term = Terminal:new({
+              cmd = ipython_cmd(),
+              dir = "git_dir",
+              direction = "vertical",
+              count = next_count,
+            }),
+            initialized = false,
+          }
+          next_count = next_count + 1
+        end
+        return repls[filepath]
+      end
+
+      -- Ensure REPL for the current file is open
       local function ensure_repl_ready()
-        if not python_repl:is_open() then
-          python_repl:open()
+        local repl = get_repl()
+        if not repl.term:is_open() then
+          repl.term:open()
         end
-        if not repl_ready then
-          vim.loop.sleep(500)
-          -- Send init PLAIN (no bracketed paste) to avoid raw markers on first send
-          local init_cmds = table.concat({
-            -- "import sys, os",
-            -- "import numpy as np",
-            -- "import pandas as pd",
-            -- "import matplotlib.pyplot as plt",
-            "",
-          }, "\n")
-          python_repl:send(init_cmds .. "\n", false)
-          repl_ready = true
-        end
+      end
+
+      -- Poll the terminal buffer for IPython's "In [" prompt, then fire callback
+      local function wait_for_ipython(callback)
+        local repl = get_repl()
+        local timer = vim.uv.new_timer()
+        local elapsed = 0
+        timer:start(
+          50,
+          50,
+          vim.schedule_wrap(function()
+            elapsed = elapsed + 50
+            local bufnr = repl.term.bufnr
+            if bufnr and vim.api.nvim_buf_is_valid(bufnr) then
+              local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+              for _, line in ipairs(lines) do
+                if line:match("In %[%d+%]") then
+                  timer:stop()
+                  timer:close()
+                  callback()
+                  return
+                end
+              end
+            end
+            if elapsed >= 10000 then
+              timer:stop()
+              timer:close()
+              callback() -- send anyway after 10s timeout
+            end
+          end)
+        )
       end
 
       -- Helpers
@@ -74,24 +107,35 @@ return {
         opts = opts or {}
         local use_cpaste = opts.cpaste or vim.g.jupyter_use_cpaste
 
+        local repl = get_repl()
+        local needs_init = not repl.initialized
         ensure_repl_ready()
 
         -- Strip trailing newlines to avoid creating an extra empty cell
         text = rstrip_newlines(text)
 
-        if not use_cpaste then
-          -- Bracketed paste: one atomic block + exactly one Enter outside the paste
-          local START, END = "\x1b[200~", "\x1b[201~"
-          python_repl:send(START .. text .. END .. "\n", false)
-        else
-          -- cpaste mode: send text and terminate with `--`
-          python_repl:send("%cpaste -q\n", false)
-          python_repl:send(text .. "\n", false)
-          python_repl:send("--\n", false)
+        local function do_send()
+          if not use_cpaste then
+            -- Bracketed paste: one atomic block + exactly one Enter outside the paste
+            local START, END = "\x1b[200~", "\x1b[201~"
+            repl.term:send(START .. text .. END .. "\n", false)
+          else
+            -- cpaste mode: send text and terminate with `--`
+            repl.term:send("%cpaste -q\n", false)
+            repl.term:send(text .. "\n", false)
+            repl.term:send("--\n", false)
+          end
+
+          -- Return focus to previous window
+          vim.cmd("wincmd p")
         end
 
-        -- Return focus to previous window
-        vim.cmd("wincmd p")
+        if needs_init then
+          repl.initialized = true
+          wait_for_ipython(do_send)
+        else
+          do_send()
+        end
       end
 
       -- Expose a simple toggle to switch paste mode at runtime
@@ -103,115 +147,22 @@ return {
         )
       end, { desc = "Toggle between bracketed paste and %cpaste" })
 
-      -- -----------------------
-      -- UI Helpers & Navigation
-      -- -----------------------
-
-      local function is_cell_marker(line)
-        return line:match(CELL_MARK) ~= nil
-      end
-
-      local function select_cell()
-        local cur = vim.fn.line(".")
-        local last = vim.fn.line("$")
-
-        -- find cell start
-        local s = cur
-        for i = cur, 1, -1 do
-          if is_cell_marker(vim.fn.getline(i)) then
-            s = i + 1
-            break
-          elseif i == 1 then
-            s = 1
-            break
-          end
-        end
-
-        -- find cell end
-        local e = last
-        for i = cur + 1, last do
-          if is_cell_marker(vim.fn.getline(i)) then
-            e = i - 1
-            break
-          end
-        end
-
-        -- trim empties
-        while s <= e and vim.fn.getline(s):match("^%s*$") do
-          s = s + 1
-        end
-        while e >= s and vim.fn.getline(e):match("^%s*$") do
-          e = e - 1
-        end
-
-        return s, e
-      end
-
-      local function next_cell()
-        local cur = vim.fn.line(".")
-        local last = vim.fn.line("$")
-        for i = cur + 1, last do
-          if is_cell_marker(vim.fn.getline(i)) then
-            vim.fn.cursor(i + 2, 1)
-            return
-          end
-        end
-      end
-
-      local function prev_cell()
-        local cur = vim.fn.line(".")
-        local marks = {}
-        local last = vim.fn.line("$")
-        for i = 1, last do
-          if is_cell_marker(vim.fn.getline(i)) then
-            table.insert(marks, i)
-          end
-        end
-        for i = #marks, 1, -1 do
-          if marks[i] < cur then
-            vim.fn.cursor(marks[i] + 0, 1)
-            return
-          end
-        end
-        vim.fn.cursor(1, 1)
-        vim.notify("At first cell")
-      end
-
-      private_create_cell_below_called = false
-      local function create_cell_below()
-        vim.cmd("normal! o")
-        vim.fn.setline(".", "# %%")
-        vim.cmd("normal! o")
-        vim.fn.setline(".", "# ----------------------------------------------------------------------")
-        vim.cmd("normal! o")
-        vim.cmd("normal! x")
-        vim.cmd("normal! o")
-        vim.cmd("startinsert")
-      end
-
-      local function smart_toggle_repl()
-        if python_repl:is_open() then
-          python_repl:close() -- hides, keeps process
-        else
-          python_repl:open()
-          vim.cmd("wincmd p")
-        end
-      end
-
       -- -------------
       -- Runners
       -- -------------
 
       local function run_cell(move_to_next)
         move_to_next = move_to_next or false
-        local s, e = select_cell()
-        if s <= e then
-          local lines = vim.api.nvim_buf_get_lines(0, s - 1, e, false)
+        local region = require("notebook-navigator").miniai_spec("i")
+        if region then
+          local lines = vim.api.nvim_buf_get_lines(0, region.from.line - 1, region.to.line, false)
           local code = table.concat(lines, "\n")
-          send_to_repl(code)
-          if move_to_next then
-            next_cell()
+          if code:match("%S") then
+            send_to_repl(code)
           end
+        end
+        if move_to_next then
+          require("notebook-navigator").move_cell("d")
         end
       end
 
@@ -223,7 +174,7 @@ return {
         local cur = vim.fn.line(".")
         local starts = { 1 }
         for i = 1, cur do
-          if is_cell_marker(vim.fn.getline(i)) then
+          if vim.fn.getline(i):match(CELL_MARK) then
             table.insert(starts, i + 1)
           end
         end
@@ -250,7 +201,7 @@ return {
         if #chunks > 0 then
           vim.notify("Running " .. #chunks .. " cells above...")
           send_to_repl(table.concat(chunks, "\n\n"))
-          vim.notify("✓ Executed " .. #chunks .. " cells above")
+          vim.notify("Executed " .. #chunks .. " cells above")
         else
           vim.notify("No cells found above current position")
         end
@@ -260,7 +211,7 @@ return {
         local last = vim.fn.line("$")
         local starts = { 1 }
         for i = 1, last do
-          if is_cell_marker(vim.fn.getline(i)) then
+          if vim.fn.getline(i):match(CELL_MARK) then
             table.insert(starts, i + 1)
           end
         end
@@ -287,100 +238,99 @@ return {
         if #chunks > 0 then
           vim.notify("Running " .. #chunks .. " cells in file...")
           send_to_repl(table.concat(chunks, "\n\n"))
-          vim.notify("✓ Executed " .. #chunks .. " cells")
+          vim.notify("Executed " .. #chunks .. " cells")
         else
           vim.notify("No cells found in file")
         end
       end
 
-      local function run_selection_or_line()
-        local mode = vim.fn.mode()
-        if mode == "v" or mode == "V" or mode == "\22" then
-          local s_pos = vim.fn.getpos("'<")
-          local e_pos = vim.fn.getpos("'>")
-          local lines = vim.api.nvim_buf_get_lines(0, s_pos[2] - 1, e_pos[2], false)
+      local function run_line()
+        send_to_repl(vim.fn.getline("."))
+      end
 
-          if #lines == 1 then
-            lines[1] = string.sub(lines[1], s_pos[3], e_pos[3])
-          elseif #lines > 1 then
-            lines[1] = string.sub(lines[1], s_pos[3])
-            lines[#lines] = string.sub(lines[#lines], 1, e_pos[3])
-          end
+      local function run_selection()
+        local s_line = vim.fn.line("v")
+        local e_line = vim.fn.line(".")
+        if s_line > e_line then
+          s_line, e_line = e_line, s_line
+        end
+        local esc = vim.api.nvim_replace_termcodes("<Esc>", true, false, true)
+        vim.api.nvim_feedkeys(esc, "x", false)
+        local lines = vim.api.nvim_buf_get_lines(0, s_line - 1, e_line, false)
+        send_to_repl(table.concat(lines, "\n"))
+      end
 
-          send_to_repl(table.concat(lines, "\n"))
+      local function smart_toggle_repl()
+        local repl = get_repl()
+        if repl.term:is_open() then
+          repl.term:close() -- hides, keeps process
         else
-          send_to_repl(vim.fn.getline("."))
+          repl.term:open()
+          vim.cmd("wincmd p")
         end
       end
 
       -- ----------------
-      -- Extra utilities
+      -- Buffer-local keymaps
       -- ----------------
 
-      local function setup_jupyter_keymaps()
+      local function setup_jupyter_keymaps(bufnr)
         local map = vim.keymap.set
+        local function buf_opts(desc)
+          return { buffer = bufnr, desc = desc }
+        end
 
         -- Exec
-        map("n", "<leader>jc", run_cell_move_to_next, { desc = "Run current cell and move to next cell" })
-        map("n", "<leader>jC", run_cell, { desc = "Run current cell and stay put" })
-        map("n", "<leader>jl", run_selection_or_line, { desc = "Run current line" })
-        map("v", "<leader>jl", run_selection_or_line, { desc = "Run selection" })
-        map("n", "<leader>ja", run_cells_above, { desc = "Run all cells above" })
-        map("n", "<leader>jf", run_all_cells, { desc = "Run all cells in file" })
+        map("n", "<leader>jc", run_cell_move_to_next, buf_opts("Run current cell and move to next cell"))
+        map("n", "<leader>jC", function()
+          run_cell(false)
+        end, buf_opts("Run current cell and stay put"))
+        map("n", "<leader>jl", run_line, buf_opts("Run current line"))
+        map("v", "<leader>jl", run_selection, buf_opts("Run selection"))
+        map("n", "<leader>ja", run_cells_above, buf_opts("Run all cells above"))
+        map("n", "<leader>jf", run_all_cells, buf_opts("Run all cells in file"))
 
-        -- Cells
-        map("n", "<leader>jn", create_cell_below, { desc = "Create cell below" })
-        map("n", "<leader>jj", next_cell, { desc = "Next cell" })
-        map("n", "<leader>jk", prev_cell, { desc = "Previous cell" })
+        -- Cells (delegated to NotebookNavigator)
+        map("n", "<leader>jn", function()
+          require("notebook-navigator").add_cell_below()
+        end, buf_opts("Create cell below"))
+        map("n", "<leader>jj", function()
+          require("notebook-navigator").move_cell("d")
+        end, buf_opts("Next cell"))
+        map("n", "<leader>jk", function()
+          require("notebook-navigator").move_cell("u")
+        end, buf_opts("Previous cell"))
 
         -- REPL visibility & lifecycle
-        map("n", "<leader>jt", smart_toggle_repl, { desc = "Toggle REPL visibility" })
+        map("n", "<leader>jt", smart_toggle_repl, buf_opts("Toggle REPL visibility"))
         map("n", "<leader>jR", function()
+          local repl = get_repl()
           ensure_repl_ready()
-          python_repl:send("%reset -f\n", false)
-        end, { desc = "IPython reset (keep session)" })
+          repl.term:send("%reset -f\n", false)
+        end, buf_opts("IPython reset (keep session)"))
         map("n", "<leader>jr", function()
+          local repl = get_repl()
           ensure_repl_ready()
-          -- Use IPython magic to clear the terminal
-          python_repl:send("%clear\n", false)
+          repl.term:send("%clear\n", false)
           vim.cmd("wincmd p")
-        end, { desc = "Clear IPython screen" })
+        end, buf_opts("Clear IPython screen"))
 
         map("n", "<leader>jx", function()
-          if python_repl:is_open() then
-            python_repl:shutdown()
-            python_repl = Terminal:new({
-              cmd = ipython_cmd(),
-              dir = "git_dir",
-              direction = "vertical",
-              count = 2,
-            })
-            repl_ready = false
-            vim.notify("REPL terminated")
+          local filepath = current_filepath()
+          local repl = repls[filepath]
+          if repl and repl.term:is_open() then
+            repl.term:shutdown()
+            repls[filepath] = nil
+            vim.notify("REPL terminated for " .. vim.fn.fnamemodify(filepath, ":t"))
           else
-            vim.notify("No REPL running")
+            vim.notify("No REPL running for this file")
           end
-        end, { desc = "Exit and destroy REPL" })
+        end, buf_opts("Exit and destroy REPL"))
 
         -- Quick helpers
         map("n", "<leader>ji", function()
           send_to_repl("plt.show()")
-        end, { desc = "Show plots" })
-
-        -- Text object for a cell (inner cell)
-        map("o", "ic", function()
-          local s, e = select_cell()
-          vim.fn.cursor(s, 1)
-          vim.cmd("normal! V")
-          vim.fn.cursor(e, vim.fn.col({ e, "$" }))
-        end, { desc = "Select cell content" })
-
-        map("n", "vic", function()
-          local s, e = select_cell()
-          vim.fn.cursor(s, 1)
-          vim.cmd("normal! V")
-          vim.fn.cursor(e, vim.fn.col({ e, "$" }))
-        end, { desc = "Select cell" })
+        end, buf_opts("Show plots"))
 
         -- Notebook conversion: .ipynb -> .py with percent cells
         map("n", "<leader>jp", function()
@@ -399,7 +349,7 @@ return {
           else
             vim.notify("Not a .ipynb file", vim.log.levels.WARN)
           end
-        end, { desc = "Convert .ipynb to .py" })
+        end, buf_opts("Convert .ipynb to .py"))
 
         -- .py -> .ipynb
         map("n", "<leader>jw", function()
@@ -413,18 +363,46 @@ return {
               vim.notify("Conversion failed. Is jupytext installed?", vim.log.levels.ERROR)
             end
           end
-        end, { desc = "Write to .ipynb" })
+        end, buf_opts("Write to .ipynb"))
       end
 
-      -- Auto-setup for Python and Jupyter files
+      local augroup = vim.api.nvim_create_augroup("JupyterSimple", { clear = true })
+
+      -- Auto-setup for Python files (covers .ipynb via jupytext's ft detection)
       vim.api.nvim_create_autocmd("FileType", {
+        group = augroup,
         pattern = "python",
-        callback = setup_jupyter_keymaps,
+        callback = function(args)
+          setup_jupyter_keymaps(args.buf)
+        end,
       })
 
-      vim.api.nvim_create_autocmd({ "BufRead", "BufNewFile" }, {
-        pattern = "*.ipynb",
-        callback = setup_jupyter_keymaps,
+      -- Auto-swap REPL when switching between Python files
+      vim.api.nvim_create_autocmd("BufEnter", {
+        group = augroup,
+        callback = function()
+          if vim.bo.filetype ~= "python" then
+            return
+          end
+
+          local filepath = current_filepath()
+
+          -- Close any REPL not belonging to the current file
+          local had_open = false
+          for fp, repl in pairs(repls) do
+            if fp ~= filepath and repl.term:is_open() then
+              repl.term:close()
+              had_open = true
+            end
+          end
+
+          -- If a REPL was visible, show the current file's REPL (if it exists)
+          local cur_repl = repls[filepath]
+          if had_open and cur_repl and not cur_repl.term:is_open() then
+            cur_repl.term:open()
+            vim.cmd("wincmd p")
+          end
+        end,
       })
     end,
   },

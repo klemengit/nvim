@@ -60,38 +60,56 @@ return {
   {
     "GCBallesteros/NotebookNavigator.nvim",
     keys = {
-      { "<leader>mj", function() require("notebook-navigator").move_cell("d") end, desc = "Next cell" },
-      { "<leader>mk", function() require("notebook-navigator").move_cell("u") end, desc = "Previous cell" },
-      { "<leader>md", function() require("notebook-navigator").add_cell_below() end, desc = "Add cell bellow" },
+      {
+        "<leader>mj",
+        function()
+          require("notebook-navigator").move_cell("d")
+        end,
+        desc = "Next cell",
+      },
+      {
+        "<leader>mk",
+        function()
+          require("notebook-navigator").move_cell("u")
+        end,
+        desc = "Previous cell",
+      },
+      {
+        "<leader>md",
+        function()
+          require("notebook-navigator").add_cell_below()
+        end,
+        desc = "Add cell bellow",
+      },
       { "<leader>mc", "<cmd>lua require('notebook-navigator').run_and_move()<cr>", desc = "Run cell and move" },
       { "<leader>mC", "<cmd>lua require('notebook-navigator').run_cell()<cr>", desc = "Run cell" },
-      { 
-        "<leader>ma", 
+      {
+        "<leader>ma",
         function()
           -- Save cursor position (line number)
           local target_line = vim.api.nvim_win_get_cursor(0)[1]
-          
+
           -- Go to top of file
           vim.cmd("normal! gg")
-          
+
           -- Run cells until we reach the target
           while true do
             -- Run current cell and move to next
-            require('notebook-navigator').run_and_move()
+            require("notebook-navigator").run_and_move()
             vim.cmd("sleep 100m")
 
             local current_line = vim.api.nvim_win_get_cursor(0)[1]
-            
+
             -- If we've passed the target cell, we're done
             if current_line >= target_line then
               break
             end
           end
-          
+
           -- Restore cursor position
-          vim.api.nvim_win_set_cursor(0, {target_line, 0})
+          vim.api.nvim_win_set_cursor(0, { target_line, 0 })
         end,
-        desc = "Run all cells above (including current)" 
+        desc = "Run all cells above (including current)",
       },
       { "<leader>mi", ":MoltenInit<CR>", desc = "Initialize molten" },
       { "<leader>mx", ":MoltenDeinit<CR>", desc = "Deinitialize molten" },
@@ -102,16 +120,21 @@ return {
       { "<leader>mb", ":MoltenOpenInBrowser<CR>", desc = "Open output in browser" },
       { "<leader>ml", ":MoltenEvaluateLine<CR>", desc = "Evaluate this line" },
       { "<leader>mv", ":<C-u>MoltenEvaluateVisual<CR>", desc = "Evaluate visual", mode = "v" },
-      { "<leader>mn",
+      {
+        "<leader>mn",
         function()
           vim.cmd("normal! o")
           vim.fn.setline(".", "# %%")
           vim.cmd("normal! o")
         end,
-        desc = "Add cell marker below"
+        desc = "Add cell marker below",
       },
-      vim.keymap.set("n", "<leader>me", ":noautocmd MoltenEnterOutput<CR>",
-          { silent = true, desc = "show/enter output" }),
+      vim.keymap.set(
+        "n",
+        "<leader>me",
+        ":noautocmd MoltenEnterOutput<CR>",
+        { silent = true, desc = "show/enter output" }
+      ),
     },
     dependencies = {
       "benlubas/molten-nvim",
@@ -148,6 +171,24 @@ return {
       window_overlap_clear_enabled = true,
       window_overlap_clear_ft_ignore = { "cmp_menu", "cmp_docs", "" },
     },
+  },
+
+  -- Make mini.ai `c` text object filetype-aware: cell in Python, class elsewhere
+  {
+    "nvim-mini/mini.ai",
+    opts = function(_, opts)
+      opts.custom_textobjects = opts.custom_textobjects or {}
+      opts.custom_textobjects.c = function(ai_type)
+        if vim.bo.filetype == "python" then
+          return require("notebook-navigator").miniai_spec(ai_type)
+        end
+        -- Fall back to LazyVim default: class treesitter spec
+        return require("mini.ai").gen_spec.treesitter({
+          a = "@class.outer",
+          i = "@class.inner",
+        })(ai_type)
+      end
+    end,
   },
 
   -- Jupytext for .ipynb <-> .py conversion
