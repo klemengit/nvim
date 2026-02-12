@@ -2,6 +2,7 @@
 return {
   {
     "mason-org/mason.nvim",
+    cond = not vim.g.lightweight,
     opts = {
       ensure_installed = {
         "stylua",

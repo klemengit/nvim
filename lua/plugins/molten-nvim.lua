@@ -36,6 +36,7 @@ return {
   -- Molten for Jupyter kernel interaction
   {
     "benlubas/molten-nvim",
+    cond = not vim.g.lightweight,
     version = "^1.0.0",
     build = ":UpdateRemotePlugins",
     init = function()
@@ -59,6 +60,7 @@ return {
   -- NotebookNavigator for simple cell detection and execution
   {
     "GCBallesteros/NotebookNavigator.nvim",
+    cond = not vim.g.lightweight,
     keys = {
       {
         "<leader>mj",
@@ -151,6 +153,7 @@ return {
   -- image.nvim for inline image rendering (only loads in compatible terminals)
   {
     "3rd/image.nvim",
+    cond = not vim.g.lightweight,
     enabled = function()
       return vim.env.TERM == "xterm-kitty" or vim.env.TERM_PROGRAM == "WezTerm"
     end,
@@ -176,6 +179,7 @@ return {
   -- Make mini.ai `c` text object filetype-aware: cell in Python, class elsewhere
   {
     "nvim-mini/mini.ai",
+    cond = not vim.g.lightweight,
     opts = function(_, opts)
       opts.custom_textobjects = opts.custom_textobjects or {}
       opts.custom_textobjects.c = function(ai_type)
@@ -194,6 +198,7 @@ return {
   -- Jupytext for .ipynb <-> .py conversion
   {
     "GCBallesteros/jupytext.nvim",
+    cond = not vim.g.lightweight,
     opts = {
       style = "percent",
       output_extension = "auto",

@@ -5,6 +5,7 @@
 return {
   {
     "akinsho/toggleterm.nvim",
+    cond = not vim.g.lightweight,
     dependencies = { "GCBallesteros/NotebookNavigator.nvim" },
     config = function()
       require("toggleterm").setup({
