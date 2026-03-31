@@ -114,7 +114,14 @@ return {
         desc = "Run all cells above (including current)",
       },
       { "<leader>mi", ":MoltenInit<CR>", desc = "Initialize molten" },
-      { "<leader>mx", ":MoltenDeinit<CR>", desc = "Deinitialize molten" },
+      {
+        "<leader>mx",
+        function()
+          vim.cmd("MoltenInterrupt")
+          vim.cmd("MoltenDeinit")
+        end,
+        desc = "Deinitialize molten",
+      },
       { "<leader>mo", ":MoltenShowOutput<CR>", desc = "Show output window" },
       { "<leader>mh", ":MoltenHideOutput<CR>", desc = "Hide output window" },
       { "<leader>mr", ":MoltenRestart<CR>", desc = "Restart Kernel" },
