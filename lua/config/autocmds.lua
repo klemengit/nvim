@@ -68,6 +68,30 @@ vim.api.nvim_create_autocmd("FileType", {
 })
 
 -- ---------------------------------------------------------------------------
+-- RST preview via restview (uv tool install restview) - a live-reloading
+-- local web server, so no bundled preview server/binary needed the way
+-- markdown-preview.nvim (lua/plugins/markdown_preview.lua) requires one.
+-- Same <leader>mp toggle mapping, just scoped to rst buffers.
+local rst_preview_job = nil
+
+vim.api.nvim_create_autocmd("FileType", {
+  pattern = "rst",
+  callback = function()
+    vim.keymap.set("n", "<leader>mp", function()
+      if rst_preview_job then
+        vim.fn.jobstop(rst_preview_job)
+        rst_preview_job = nil
+        vim.notify("RST preview stopped", vim.log.levels.INFO)
+      else
+        local file = vim.fn.expand("%:p")
+        rst_preview_job = vim.fn.jobstart({ "restview", file }, { detach = true })
+        vim.notify("RST preview started: " .. file, vim.log.levels.INFO)
+      end
+    end, { buffer = true, desc = "Toggle RST Preview" })
+  end,
+})
+
+-- ---------------------------------------------------------------------------
 -- Add a visual separator to the notebook cells (molten)
 local function update_cell_separators()
   local ns = vim.api.nvim_create_namespace("molten_cells")
