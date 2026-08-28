@@ -1,5 +1,5 @@
 -- "Open with..." for the snacks explorer / file picker.
--- `o` opens a file with the system default (built-in snacks action);
+-- `o` opens the selected file(s) with the system default application;
 -- `O` opens a menu of the desktop applications registered for that file type.
 
 local M = {}
@@ -41,23 +41,31 @@ local function desktop_path(id)
   end
 end
 
---- Human-readable Name= from the [Desktop Entry] section.
-local function desktop_name(path)
+--- Keys of the [Desktop Entry] section, unlocalised (Name, Terminal, Exec, ...).
+---@return table<string, string>
+local function desktop_entry(path)
   local ok, lines = pcall(vim.fn.readfile, path)
   if not ok then
-    return nil
+    return {}
   end
-  local in_entry = false
+  local entry, in_entry = {}, false
   for _, line in ipairs(lines) do
     if line:match("^%[") then
       in_entry = line == "[Desktop Entry]"
     elseif in_entry then
-      local name = line:match("^Name%s*=%s*(.+)$")
-      if name then
-        return vim.trim(name)
+      local key, val = line:match("^([%w-]+)%s*=%s*(.*)$")
+      if key and not entry[key] then
+        entry[key] = vim.trim(val)
       end
     end
   end
+  return entry
+end
+
+--- Human-readable Name= of a desktop entry.
+local function desktop_name(path)
+  local name = desktop_entry(path).Name
+  return name ~= "" and name or nil
 end
 
 local function sh(cmd)
@@ -99,8 +107,81 @@ local function apps_for_mime(mime)
 end
 
 --- Run a command detached, so it survives closing Neovim.
-local function spawn(cmd)
-  vim.fn.jobstart(cmd, { detach = true })
+--- Failures are reported instead of being swallowed: a silent no-op is the
+--- usual symptom of a missing handler or a Terminal=true entry that could not
+--- find a terminal.
+---@param cmd string[]
+---@param what? string label used in the failure message
+local function spawn(cmd, what)
+  vim.system(cmd, { detach = true, text = true }, function(out)
+    if out.code ~= 0 then
+      local msg = vim.trim((out.stderr or "") .. " " .. (out.stdout or ""))
+      vim.schedule(function()
+        vim.notify(
+          ("Failed to open %s (exit %d)\n%s\n%s"):format(what or cmd[1], out.code, table.concat(cmd, " "), msg),
+          vim.log.levels.ERROR
+        )
+      end)
+    end
+  end)
+end
+
+--- Mime type of a file, e.g. "text/x-lua".
+local function mime_of(file)
+  local mime = sh({ "xdg-mime", "query", "filetype", file })
+  return mime and vim.trim(mime) or "application/octet-stream"
+end
+
+--- Open one or more files with their default application.
+--- Resolves the default via `gio mime`, which follows mime subclassing (so
+--- text/javascript inherits the text/plain handler) where `xdg-mime query
+--- default` returns nothing. Falls back to xdg-open when nothing is registered.
+--- Open files in the current window: the first replaces it, the rest are added
+--- to the buffer list.
+---@param files string[]
+local function edit_here(files)
+  vim.cmd.edit(vim.fn.fnameescape(files[1]))
+  for i = 2, #files do
+    vim.cmd.badd(vim.fn.fnameescape(files[i]))
+  end
+  if #files > 1 then
+    vim.notify(("Opened %s, added %d more to the buffer list"):format(vim.fn.fnamemodify(files[1], ":t"), #files - 1))
+  end
+end
+
+---@param files string[]
+---@param edit? fun(files: string[]) how to open files handled by a terminal app
+function M.open_default(files, edit)
+  files = vim.tbl_filter(function(f)
+    return f and f ~= ""
+  end, files or {})
+  if #files == 0 then
+    return vim.notify("Open: no file selected", vim.log.levels.WARN)
+  end
+
+  local to_edit = {}
+  for _, f in ipairs(files) do
+    local mime = mime_of(f)
+    local id = apps_for_mime(mime)[1]
+    local path = id and desktop_path(id)
+    local entry = path and desktop_entry(path) or {}
+    local name = vim.fn.fnamemodify(f, ":t")
+    if entry.Terminal == "true" then
+      -- the default handler is a terminal app (nvim itself, for most text
+      -- files) -- open it here instead of spawning a second editor
+      table.insert(to_edit, f)
+    elseif path then
+      vim.notify(("Opening %s with %s"):format(name, desktop_name(path) or id), vim.log.levels.INFO)
+      spawn({ "gio", "launch", path, f }, desktop_name(path) or id)
+    else
+      vim.notify(("No app registered for %s (%s); trying xdg-open"):format(name, mime), vim.log.levels.WARN)
+      spawn({ "xdg-open", f }, "xdg-open")
+    end
+  end
+
+  if #to_edit > 0 then
+    (edit or edit_here)(to_edit)
+  end
 end
 
 --- Show the "Open with" menu for one or more files.
@@ -113,8 +194,7 @@ function M.open_with(files)
     return vim.notify("Open with: no file selected", vim.log.levels.WARN)
   end
 
-  local mime = sh({ "xdg-mime", "query", "filetype", files[1] })
-  mime = mime and vim.trim(mime) or "application/octet-stream"
+  local mime = mime_of(files[1])
 
   ---@type { label: string, run: fun() }[]
   local choices = {}
@@ -124,7 +204,7 @@ function M.open_with(files)
       table.insert(choices, {
         label = (desktop_name(path) or id:gsub("%.desktop$", "")) .. "  (" .. id .. ")",
         run = function()
-          spawn(vim.list_extend({ "gio", "launch", path }, files))
+          spawn(vim.list_extend({ "gio", "launch", path }, files), desktop_name(path) or id)
         end,
       })
     end
@@ -134,7 +214,7 @@ function M.open_with(files)
     label = "xdg-open  (system default)",
     run = function()
       for _, f in ipairs(files) do
-        spawn({ "xdg-open", f })
+        spawn({ "xdg-open", f }, "xdg-open")
       end
     end,
   })
@@ -143,7 +223,7 @@ function M.open_with(files)
     run = function()
       vim.ui.input({ prompt = "Command: " }, function(cmd)
         if cmd and cmd ~= "" then
-          spawn(vim.list_extend(vim.split(cmd, "%s+", { trimempty = true }), files))
+          spawn(vim.list_extend(vim.split(cmd, "%s+", { trimempty = true }), files), cmd)
         end
       end)
     end,
@@ -164,8 +244,8 @@ function M.open_with(files)
   end)
 end
 
---- Picker action: use the selected items, falling back to the item under the cursor.
-local function picker_open_with(picker, item)
+--- Selected picker items, falling back to the item under the cursor.
+local function picker_files(picker, item)
   local files = {}
   for _, it in ipairs(picker:selected({ fallback = true })) do
     table.insert(files, Snacks.picker.util.path(it))
@@ -173,12 +253,39 @@ local function picker_open_with(picker, item)
   if #files == 0 and item then
     files = { Snacks.picker.util.path(item) }
   end
-  M.open_with(files)
+  return files
 end
 
 local source = {
-  actions = { open_with = picker_open_with },
-  win = { list = { keys = { ["O"] = "open_with" } } },
+  actions = {
+    open_with = function(picker, item)
+      M.open_with(picker_files(picker, item))
+    end,
+    open_default = function(picker, item)
+      M.open_default(picker_files(picker, item), function(files)
+        -- open in the editor window the picker was called from, never in the
+        -- picker's own window
+        local function go()
+          if picker.main and vim.api.nvim_win_is_valid(picker.main) then
+            vim.api.nvim_set_current_win(picker.main)
+          end
+          edit_here(files)
+        end
+        if vim.fn.mode():sub(1, 1) == "i" then
+          vim.cmd.stopinsert()
+          vim.schedule(go)
+        else
+          go()
+        end
+      end)
+    end,
+  },
+  -- bound on the list window, and on the input window in normal mode, so the
+  -- keys work no matter which half of the picker has focus
+  win = {
+    list = { keys = { ["o"] = "open_default", ["O"] = "open_with" } },
+    input = { keys = { ["o"] = { "open_default", mode = "n" }, ["O"] = { "open_with", mode = "n" } } },
+  },
 }
 
 return {
