@@ -7,7 +7,7 @@ cross-platform support and automated setup.
 
 ```bash
 # Clone this configuration
-git clone <your-repo-url> ~/.config/nvim
+git clone git@github.com:klemengit/nvim.git ~/.config/nvim
 
 # Install manually (see Manual Installation below)
 ```
@@ -70,7 +70,7 @@ choco install neovim
 mv ~/.config/nvim ~/.config/nvim.backup
 
 # Clone this repo
-git clone <your-repo-url> ~/.config/nvim
+git clone git@github.com:klemengit/nvim.git ~/.config/nvim
 cd ~/.config/nvim
 ```
 
